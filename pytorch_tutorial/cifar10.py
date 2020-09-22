@@ -36,28 +36,80 @@ class Net(nn.Module):
     def __init__(self):
         # question: super function? __init__ function?
         super(Net, self).__init__()
-        # 1 input image channel, 6 output channels, 3 x 3 square convolution
-        # kernel
-        self.conv1 = nn.Conv2d(1, 6, 3)
-        self.conv2 = nn.Conv2d(6, 16, 3)
-        # an affine operation : y = Wx + b
-        self.fc1 = nn.Linear(16 * 6 * 6, 120)
+        self.conv1 = nn.Conv2d(3, 6, 5)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(6, 16, 5)
+        self.fc1 = nn.Linear(16 * 5 * 5, 120)
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 10)
 
+
+
     def forward(self, x):
-        # Max pooling over a (2, 2) window
-        x = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))
-        # If the size is a square you can only specify a single number
-        x = F.max_pool2d(F.relu(self.conv2(x)), 2)
-        x = x.view(-1, self.num_flat_features(x))
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = x.view(-1, 16 * 5 * 5)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
 
+
 net = Net()
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+#
+# for epoch in range(2):
+#     running_loss = 0.0
+#     for i, data in enumerate(trainloader, 0):
+#         # get the inputs, data is a list of [inputs, labels]
+#         inputs, labels = data
+#
+#         # zero the parameter gradients
+#         optimizer.zero_grad()
+#
+#         # forward + backward + optimize
+#         outputs = net(inputs)
+#         loss = criterion(outputs, labels)
+#         loss.backward()
+#         optimizer.step()
+#
+#         # print statistics
+#         running_loss += loss.item()
+#         if i % 2000 == 1999:
+#             print('[%d  %5d] loss: %.3f' % (epoch + 1, i + 1, running_loss / 2000))
+#             running_loss = 0
+#
+# print('Finished Training')
+#
+PATH = '/media/sata/meepo/data/cifar-10/model/cifar_net.pth'
+# torch.save(net.state_dict(), PATH)
 
 
+dataiter = iter(testloader)
+images, labels = dataiter.next()
+
+imshow(torchvision.utils.make_grid(images))
+print("GroundTruth: ", ''.join('%s ' % classes[labels[j]] for j in range(4)))
+
+net.load_state_dict(torch.load(PATH))
+outputs = net(images)
+_, predicted = torch.max(outputs, 1)
+
+print('Predicted: ', ''.join('%s ' % classes[predicted[j]] for j in range(4)))
+
+
+correct = 0
+total = 0
+with torch.no_grad():
+    for data in testloader:
+        images, labels = data
+        outputs = net(images)
+        _, predicted = torch.max(outputs.data, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+
+print(f"Accuracy of the network on the 10000 test images: {100 * correct / total}%")
+
+class_correct = list(0. for i in  range(10))
+class_total = list(0. for i in range(10))
